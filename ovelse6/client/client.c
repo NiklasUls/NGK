@@ -11,8 +11,9 @@ Modified: Michael Alrøe
 #include <string.h>
 #include <sys/socket.h>
 #include <netdb.h> 
+#include "iknlib.h"
 
-#define BUFSIZE 256
+#define BUFSIZE 1000
 
 void error(const char *msg)
 {
@@ -28,6 +29,10 @@ int main(int argc, char *argv[])
 	struct sockaddr_in serv_addr;
 	struct hostent *server;
 	uint8_t buffer[BUFSIZE];
+	FILE * fp;
+	ssize_t numBytes;
+	char bufferr[BUFSIZE];
+	int bytes_written = 0;
     
 	if (argc < 3)
 	    error( "ERROR usage: ""hostname"",  ""port""");
@@ -52,17 +57,34 @@ int main(int argc, char *argv[])
 	    error("ERROR connecting");
 
 	printf("Please enter the message: ");
-	fgets((char*)buffer,sizeof(buffer),stdin);
-	n = write(sockfd,buffer,strlen((char*)buffer));  // socket write
-	if (n < 0) 
-	    error("ERROR writing to socket");
+	char input[256];
+	fgets(input, sizeof(input),stdin);
+	input[strcspn(input, "\n")]=0;
+	n = write(sockfd, input, sizeof(input));
+	if(n == 0) error("Failed to send filename to server\n");
 	
-    bzero(buffer,sizeof(buffer));
-	//n = read(sockfd,buffer,sizeof(buffer));  // socket read
-	n = recv(sockfd, buffer, sizeof(buffer), MSG_WAITALL);  // waits for full buffer or connection close
-	if (n < 0) 
-	    error("ERROR reading from socket");
-	printf("\n%s\n",(char*)buffer);
+	const char* fileName = extractFileName(input);	//Extract filename from user-input.
+	long fileSize = readFileSizeTCP(sockfd);	//Read filesize wich is send from server
+	if (fileSize == -1) 
+	    error("File doesnt exist");
+	printf("\nFilename: %s, Filesize: %ld bytes\n", fileName, fileSize);
+
+
+	
+	fp = fopen(fileName, "wb");
+	int bytes_to_recieve=0;
+	int i=1;
+	while (1)
+	{
+		bytes_to_recieve = ((BUFSIZE*i++>fileSize)? (fileSize%BUFSIZE) : BUFSIZE);
+		numBytes = read(sockfd, bufferr, bytes_to_recieve);
+		printf("Bytes to recieve: %i. numBytes: %zu\n", bytes_to_recieve, numBytes);
+		fwrite(bufferr, 1, numBytes, fp);
+		bzero(bufferr, BUFSIZE);
+		if(bytes_to_recieve != BUFSIZE) break;
+	}
+	
+	fclose(fp);
 
     printf("Closing client...\n\n");
 	close(sockfd);
