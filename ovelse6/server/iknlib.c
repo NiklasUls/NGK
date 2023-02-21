@@ -26,14 +26,15 @@ void readTextTCP(int inSocket, char* text, int maxLength )
 {
     char ch=0;
     int pos=0;
+    int n;
 
-    read(inSocket, &ch, 1);
+    n = read(inSocket, &ch, 1);
 
     while(ch != 0)
     {
         if(pos < maxLength)
             text[pos++] = ch;
-        read(inSocket, &ch, 1);
+        n = read(inSocket, &ch, 1);
     }
     text[pos]=0;  // insert null termination
 }

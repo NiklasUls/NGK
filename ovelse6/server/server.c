@@ -14,7 +14,7 @@ Modified: Michael Alrøe
 #include "iknlib.h"
 
 #define BUFSIZE_RX 200
-#define BUFSIZE_TX 256
+#define BUFSIZE_TX 1000
 
 void error(const char *msg)
 {
@@ -58,23 +58,51 @@ int main(int argc, char *argv[])
 
 	for (;;)
 	{
+		char recievedMessage[BUFSIZE_RX];
+		char sendMessage[BUFSIZE_TX];
+		const char* filename;
+
 		printf("Accept...\n");
 		newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
 
 		if (newsockfd < 0) error("ERROR on accept");
 		else printf("Accepted\n");
 
-		bzero(bufferRx,sizeof(bufferRx));
-		n = read(newsockfd,bufferRx,sizeof(bufferRx));
 
-		if (n < 0) error("ERROR reading from socket");
-		printf("Message: %s\n",(char*)bufferRx);
-		
-		snprintf((char*)bufferTx, sizeof(bufferTx), "Got message: %s",(char*)bufferRx);
+		readTextTCP(newsockfd, recievedMessage, BUFSIZE_RX);
+		printf("Read done \n");
+		filename = extractFileName(recievedMessage);
+		printf("Client ask for filename: %s\n", filename);
 
-		n = write(newsockfd,bufferTx,strlen((char*)bufferTx));
-		if (n < 0) error("ERROR writing to socket");
+		//Filehandling
+		size_t numBytes;
+		FILE * fp;
+		FILE * fw;
+		fp = fopen(filename, "rb");
+		fw = fopen("test.txt", "wb");
+		if(fp == 0){
+			writeTextTCP(newsockfd, "-1");
+			printf("Requested file doesn't exists: %s\n", filename);
+		} else {
+			long fileSize = getFilesize(filename);
+			snprintf(sendMessage, BUFSIZE_TX, "%ld", fileSize);
+			writeTextTCP(newsockfd, sendMessage);	//Send filesize to client
+			printf("Filesize is send\n");
+
+			uint8_t tmpBuf[BUFSIZE_TX];
+			numBytes = fread(tmpBuf, 1, sizeof(tmpBuf), fp);  // Automatic seek!
+			int total_bytes=0;
+			while (numBytes) {
+				total_bytes = total_bytes + write(newsockfd, tmpBuf, numBytes);
+				fwrite(tmpBuf, 1, numBytes, fw);
+				printf("Send bytes: %i of %ld\n", total_bytes, fileSize);
+				numBytes = fread(tmpBuf, 1, sizeof(tmpBuf), fp);  // Automatic seek!
+			}
 			
+
+		}
+		fclose(fw);
+		fclose(fp);
 		close(newsockfd);
 	}
 	close(sockfd);
