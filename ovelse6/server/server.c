@@ -77,32 +77,29 @@ int main(int argc, char *argv[])
 		//Filehandling
 		size_t numBytes;
 		FILE * fp;
-		FILE * fw;
-		fp = fopen(filename, "rb");
-		fw = fopen("test.txt", "wb");
+		fp = fopen(filename, "rb");	
 		if(fp == 0){
 			writeTextTCP(newsockfd, "-1");
 			printf("Requested file doesn't exists: %s\n", filename);
 		} else {
+			
 			long fileSize = getFilesize(filename);
 			snprintf(sendMessage, BUFSIZE_TX, "%ld", fileSize);
 			writeTextTCP(newsockfd, sendMessage);	//Send filesize to client
 			printf("Filesize is send\n");
 
-			uint8_t tmpBuf[BUFSIZE_TX];
+			char tmpBuf[BUFSIZE_TX];
 			numBytes = fread(tmpBuf, 1, sizeof(tmpBuf), fp);  // Automatic seek!
 			int total_bytes=0;
 			while (numBytes) {
 				total_bytes = total_bytes + write(newsockfd, tmpBuf, numBytes);
-				fwrite(tmpBuf, 1, numBytes, fw);
 				printf("Send bytes: %i of %ld\n", total_bytes, fileSize);
 				numBytes = fread(tmpBuf, 1, sizeof(tmpBuf), fp);  // Automatic seek!
 			}
 			
-
+			fclose(fp);
 		}
-		fclose(fw);
-		fclose(fp);
+		
 		close(newsockfd);
 	}
 	close(sockfd);
