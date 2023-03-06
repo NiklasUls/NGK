@@ -1,71 +1,77 @@
-/* A simple server in the internet domain using TCP
-The port number is passed as an argument 
-Based on example: https://www.linuxhowtos.org/C_C++/socket.htm 
+	/* Creates a datagram server.  The port 
+	number is passed as an argument.  This
+	server runs forever */
 
-Modified: Michael Alrøe
-*/
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/types.h> 
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include "iknlib.h"
-
-#define BUFSIZE_RX 200
-#define BUFSIZE_TX 1000
+	#include <sys/types.h>
+	#include <stdlib.h>
+	#include <unistd.h>
+	#include <sys/socket.h>
+	#include <netinet/in.h>
+	#include <string.h>
+	#include <netdb.h>
+	#include <stdio.h>
+	#include "iknlib.h"
 
 void error(const char *msg)
 {
 	perror(msg);
-	exit(1);
+	exit(0);
 }
 
 int main(int argc, char *argv[])
 {
-	printf("Starting server...\n");
+	int sock, length, n, fejl;
+	socklen_t fromlen;
+	struct sockaddr_in server;
+	struct sockaddr_in from;
+	char buf_rx[1];
+	char buf_tx[1024];
 
-	int sockfd, newsockfd, portno;
-
-	socklen_t clilen;
-	char bufferRx[BUFSIZE_RX];
-	char bufferTx[BUFSIZE_TX];
-	struct sockaddr_in serv_addr, cli_addr;
-	int n;
-	
-	if (argc < 2) 
-		error("ERROR usage: port");
-
-
-	sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	if (sockfd < 0) 
-		error("ERROR opening socket");
-
-	printf("Binding...\n");
-	bzero(&serv_addr, sizeof(serv_addr));
-	portno = atoi(argv[1]);
-	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_addr.s_addr = INADDR_ANY;
-	serv_addr.sin_port = htons(portno);
-	if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) 
-		error("ERROR on binding");
-
-	printf("Listen...\n");
-	listen(sockfd,5);
-	
-	clilen = sizeof(cli_addr);
-
-
-	while (1)
-	{
-		n = recvfrom(sockfd, bufferTx, BUFSIZE_TX, 0, (struct sockaddr *)&cli_addr, &clilen);
-		if(n<0) error("recvfrom");
-		write(1, "Received a datagram: ", 21);
-		write(1, bufferTx, n);
-		n = sendto(sockfd, "Got your message\n", 17, 0, (struct sockaddr *)&cli_addr, clilen);
-		if(n<0) error("Sendto");
+	if (argc < 2) {
+		fprintf(stderr, "ERROR, no port provided\n");
+		exit(0);
 	}
-	close(sockfd);
-	return 0; 
+	
+	sock=socket(AF_INET, SOCK_DGRAM, 0);
+		if (sock < 0) error("Opening socket");
+
+	length = sizeof(server);
+	bzero(&server,length);
+	server.sin_family=AF_INET;
+	server.sin_addr.s_addr=INADDR_ANY;
+	server.sin_port=htons(atoi(argv[1]));
+	if (bind(sock,(struct sockaddr *)&server,length)<0) 
+		error("binding");
+	fromlen = sizeof(struct sockaddr_in);
+	while (1) {
+		n = recvfrom(sock,buf_rx,1 ,0,(struct sockaddr *)&from,&fromlen);
+		if (n < 0) error("recvfrom");
+		write(1,"Received a datagram: ",21);
+		write(1,buf_rx,n);
+		size_t numBytes;
+		FILE * fp;
+		const char* filename;
+		if(buf_rx[0]=='U' || buf_rx[0]=='u'){
+			filename = "/proc/uptime";
+		} else if(buf_rx[0]=='L' || buf_rx[0]=='l'){
+			filename = "/proc/loadavg";
+		} else {
+			fejl=1;
+		}
+		fp=fopen(filename, "rb");
+		if(fp == 0 || fejl != 0){
+			fejl = 0;
+			n = sendto(sock,"Wrong input\n",12, 0,(struct sockaddr *)&from,fromlen);
+			printf("Input ikke korrekt\n");
+			if (n  < 0) error("sendto");
+		} else{
+			long fileSize = getFilesize(filename);
+			numBytes = fread(buf_tx, 1, sizeof(buf_tx), fp);
+			n = sendto(sock,buf_tx, numBytes, 0,(struct sockaddr *)&from, fromlen);
+			if(n<0) error("Unable to send data from file\n");		
+		}
+		
+	}
+	return 0;
 }
+
