@@ -46,8 +46,8 @@ int main(int argc, char *argv[])
 	size_t fileSize;
 	FILE * fp;
     
-	if (argc < 3)
-	    error( "ERROR usage: ""hostname"",  ""port""");
+	if (argc < 4)
+	    error( "ERROR usage: ""hostname"",  ""port"", ""File""");
 
 	portno = atoi(argv[2]);
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -68,12 +68,10 @@ int main(int argc, char *argv[])
 	if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) 
 	    error("ERROR connecting");
 
-	printf("Please enter file name: ");
-	fgets((char*)buffer,sizeof(buffer),stdin);
-	buffer[strcspn(buffer,"\n")]=0;
-	writeTextTCP(sockfd, buffer);
 
-	const char * fileName = extractFileName(buffer);
+	writeTextTCP(sockfd, argv[3]);
+
+	const char * fileName = extractFileName(argv[3]);
 	fileSize = readFileSizeTCP(sockfd);
 	if (fileSize == -1)
 	{

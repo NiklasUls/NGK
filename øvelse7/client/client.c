@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
 	struct hostent *hp;
 	char bufferr[BUFSIZE];
     
-	if(argc != 4)error("Usage: server port\n");
+	if(argc != 4)error("Mangler argument\n");
 
 	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 	if(sockfd < 0) error("socket");
